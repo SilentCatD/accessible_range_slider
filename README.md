@@ -33,7 +33,7 @@ with a RangeSlider using the keyboard or receiving focus.
 The root of the problem lies in the makeshift implementation of accessibility, currently using 
 LeafRenderObjectWidget and creating a custom semantic boundary to support screen readers.
 
-This poses a challenge since the slider cannot properly receive focus because there are no child 
+This poses a challenge since the slider's thumbs cannot properly receive focus because there are no child 
 widgets to receive focus.
 
 To address this limitation, this package rewrites the internal implementation of RangeSlider to use 
