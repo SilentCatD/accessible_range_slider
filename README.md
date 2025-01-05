@@ -11,29 +11,70 @@ and the Flutter guide for
 [developing packages and plugins](https://flutter.dev/developing-packages).
 -->
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
 
-## Features
-
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+<img src="https://github.com/SilentCatD/accessible_range_slider/blob/main/assets/example.png?raw=true" width="200px">
 
 ## Getting started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+First import the widget
+
+```dart
+import 'package:accessible_range_slider/accessible_range_slider.dart';
+```
+
+## Features
+
+When implementing accessibility, enabling keyboard navigation for interactive elements is crucial.
+
+However, due to a current limitation in the implementation, the framework does not support interacting
+with a RangeSlider using the keyboard or receiving focus.
+
+The root of the problem lies in the makeshift implementation of accessibility, currently using 
+LeafRenderObjectWidget and creating a custom semantic boundary to support screen readers.
+
+This poses a challenge since the slider cannot properly receive focus because there are no child 
+widgets to receive focus.
+
+To address this limitation, this package rewrites the internal implementation of RangeSlider to use 
+SlottedMultiChildRenderObjectWidget. By splitting each thumb into its own node, the slider can now 
+handle focus, screen reader actions, and keyboard interactions effectively.
 
 ## Usage
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
 ```dart
-const like = 'sample';
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key, required this.title});
+
+  final String title;
+
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  RangeValues _values = const RangeValues(0, 1);
+
+  void _rangeValuesChanged(RangeValues values) {
+    setState(() {
+      _values = values;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text(widget.title),
+      ),
+      body: Center(
+        child: AccessibleRangeSlider(
+          values: _values,
+          onChanged: _rangeValuesChanged,
+        ),
+      ),
+    );
+  }
+}
 ```
-
-## Additional information
-
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+Just replace the original `RangeSlider` with `AccessibleRangeSlider` and you're good to go
