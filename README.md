@@ -11,6 +11,7 @@ and the Flutter guide for
 [developing packages and plugins](https://flutter.dev/developing-packages).
 -->
 
+[![pub package](https://img.shields.io/pub/v/accessible_range_slider?color=green&include_prereleases&style=plastic)](https://pub.dev/packages/accessible_range_slider)
 
 <img src="https://github.com/SilentCatD/accessible_range_slider/blob/main/assets/example.png?raw=true" width="200px">
 
