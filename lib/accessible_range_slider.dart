@@ -393,6 +393,8 @@ class AccessibleRangeSlider extends StatefulWidget {
 class _AccessibleRangeSliderState extends State<AccessibleRangeSlider>
     with TickerProviderStateMixin {
   final _renderSliderKey = GlobalKey();
+  final _renderStartThumbKey = GlobalKey();
+  final _renderEndThumbKey = GlobalKey();
 
   static const Duration enableAnimationDuration = Duration(milliseconds: 75);
   static const Duration valueIndicatorAnimationDuration =
@@ -756,6 +758,7 @@ class _AccessibleRangeSliderState extends State<AccessibleRangeSlider>
             endThumb: FocusTraversalOrder(
               order: const NumericFocusOrder(1),
               child: _AccessibleThumb(
+                renderThumbKey: _renderEndThumbKey,
                 values: _unlerpRangeValues(widget.values),
                 divisions: widget.divisions,
                 focusNode: _endThumbFocusNode,
@@ -781,8 +784,11 @@ class _AccessibleRangeSliderState extends State<AccessibleRangeSlider>
                 renderSliderKey: _renderSliderKey,
                 targetPlatform: Theme.of(context).platform,
                 semanticFormatterCallback: widget.semanticFormatterCallback,
+                renderThumbKey: _renderStartThumbKey,
               ),
             ),
+            startThumbKey: _renderStartThumbKey,
+            endThumbKey: _renderEndThumbKey,
           ),
         ),
       ),
@@ -827,6 +833,8 @@ class _RangeSliderRenderObjectWidget
     required this.hovering,
     required this.endThumb,
     required this.startThumb,
+    required this.startThumbKey,
+    required this.endThumbKey,
   });
 
   final RangeValues values;
@@ -842,6 +850,8 @@ class _RangeSliderRenderObjectWidget
   final bool hovering;
   final Widget startThumb;
   final Widget endThumb;
+  final GlobalKey startThumbKey;
+  final GlobalKey endThumbKey;
 
   @override
   _RenderRangeSlider createRenderObject(BuildContext context) {
@@ -860,6 +870,8 @@ class _RangeSliderRenderObjectWidget
       textDirection: Directionality.of(context),
       hovering: hovering,
       gestureSettings: MediaQuery.gestureSettingsOf(context),
+      startThumbKey: startThumbKey,
+      endThumbKey: endThumbKey,
     );
   }
 
@@ -915,6 +927,8 @@ class _RenderRangeSlider extends RenderBox
     required TextDirection textDirection,
     required bool hovering,
     required DeviceGestureSettings gestureSettings,
+    required this.startThumbKey,
+    required this.endThumbKey,
   })  : assert(values.start >= 0.0 && values.start <= 1.0),
         assert(values.end >= 0.0 && values.end <= 1.0),
         _labels = labels,
@@ -961,6 +975,9 @@ class _RenderRangeSlider extends RenderBox
       curve: Curves.easeInOut,
     );
   }
+
+  final GlobalKey startThumbKey;
+  final GlobalKey endThumbKey;
 
   // Keep track of the last selected thumb so they can be drawn in the
   // right order.
@@ -1080,7 +1097,7 @@ class _RenderRangeSlider extends RenderBox
       return;
     }
     _divisions = value;
-    markNeedsPaint();
+    markNeedsLayout();
   }
 
   RangeLabels? get labels => _labels;
@@ -1102,7 +1119,7 @@ class _RenderRangeSlider extends RenderBox
       return;
     }
     _sliderTheme = value;
-    markNeedsPaint();
+    markNeedsLayout();
   }
 
   ThemeData? get theme => _theme;
@@ -1312,6 +1329,12 @@ class _RenderRangeSlider extends RenderBox
   RenderBox? get _startThumb => childForSlot(Thumb.start);
 
   RenderBox? get _endThumb => childForSlot(Thumb.end);
+
+  _RenderThumbWidget? get _startRenderThumb =>
+      startThumbKey.currentContext?.findRenderObject() as _RenderThumbWidget?;
+
+  _RenderThumbWidget? get _endRenderThumb =>
+      endThumbKey.currentContext?.findRenderObject() as _RenderThumbWidget?;
 
   @override
   void systemFontsDidChange() {
@@ -1602,6 +1625,8 @@ class _RenderRangeSlider extends RenderBox
   @override
   void performLayout() {
     _updateThumbCenters();
+    _startRenderThumb?.minThumbSeparationValue = _minThumbSeparationValue;
+    _endRenderThumb?.minThumbSeparationValue = _minThumbSeparationValue;
     if (_startThumb != null) {
       _startThumb!.layout(
         constraints,
@@ -1944,18 +1969,37 @@ class _RenderValueIndicator extends RenderBox
 
 class _ThumbWidget extends LeafRenderObjectWidget {
   const _ThumbWidget({
+    super.key,
     required this.sliderTheme,
     required this.thumb,
     required this.onChanged,
     required this.divisions,
-    required this.state,
+    required this.rangeSliderState,
+    required this.values,
+    required this.semanticFormatterCallback,
   });
 
   final SliderThemeData sliderTheme;
   final Thumb thumb;
   final ValueChanged<RangeValues>? onChanged;
   final int? divisions;
-  final _AccessibleRangeSliderState state;
+  final _AccessibleRangeSliderState rangeSliderState;
+  final RangeValues values;
+  final SemanticFormatterCallback? semanticFormatterCallback;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return _RenderThumbWidget(
+      semanticFormatterCallback: semanticFormatterCallback,
+      thumb: thumb,
+      sliderTheme: sliderTheme,
+      rangeSliderState: rangeSliderState,
+      textDirection: Directionality.of(context),
+      platform: Theme.of(context).platform,
+      onChanged: onChanged,
+      values: values,
+    );
+  }
 
   @override
   void updateRenderObject(
@@ -1963,19 +2007,10 @@ class _ThumbWidget extends LeafRenderObjectWidget {
     renderObject
       ..sliderTheme = sliderTheme
       ..textDirection = Directionality.of(context)
-      ..onChanged = onChanged;
-  }
-
-  @override
-  RenderObject createRenderObject(BuildContext context) {
-    return _RenderThumbWidget(
-      thumb: thumb,
-      sliderTheme: sliderTheme,
-      state: state,
-      textDirection: Directionality.of(context),
-      platform: Theme.of(context).platform,
-      onChanged: onChanged,
-    );
+      ..platform = Theme.of(context).platform
+      ..onChanged = onChanged
+      ..values = values
+      ..semanticFormatterCallback = semanticFormatterCallback;
   }
 }
 
@@ -1983,24 +2018,29 @@ class _RenderThumbWidget extends RenderBox {
   _RenderThumbWidget({
     required this.thumb,
     required SliderThemeData sliderTheme,
-    required _AccessibleRangeSliderState state,
+    required _AccessibleRangeSliderState rangeSliderState,
     required TextDirection textDirection,
     required TargetPlatform platform,
     required ValueChanged<RangeValues>? onChanged,
-  })  : _state = state,
+    required RangeValues values,
+    required SemanticFormatterCallback? semanticFormatterCallback,
+  })  : _rangeSliderState = rangeSliderState,
+        _semanticFormatterCallback = semanticFormatterCallback,
         _sliderTheme = sliderTheme,
         _onChanged = onChanged,
-        _textDirection = textDirection {
+        _textDirection = textDirection,
+        _platform = platform,
+        _values = values {
     _overlayAnimation = CurvedAnimation(
-      parent: _state.overlayController,
+      parent: _rangeSliderState.overlayController,
       curve: Curves.fastOutSlowIn,
     );
     _enableAnimation = CurvedAnimation(
-      parent: _state.enableController,
+      parent: _rangeSliderState.enableController,
       curve: Curves.easeInOut,
     );
-    _lastThumbSelected = _state._lastThumbSelection;
-    _thumbDelta = _state._thumbDelta;
+    _lastThumbSelected = _rangeSliderState._lastThumbSelection;
+    _thumbDelta = _rangeSliderState._thumbDelta;
   }
 
   late CurvedAnimation _overlayAnimation;
@@ -2009,8 +2049,22 @@ class _RenderThumbWidget extends RenderBox {
   late ValueListenable<Thumb?> _lastThumbSelected;
   late ValueListenable<double> _thumbDelta;
 
-  final _AccessibleRangeSliderState _state;
+  final _AccessibleRangeSliderState _rangeSliderState;
   final Thumb thumb;
+
+  RangeValues get values => _values;
+  RangeValues _values;
+
+  set values(RangeValues newValues) {
+    final RangeValues convertedValues = isDiscrete
+        ? _discretizeRangeValues(newValues, isDiscrete, divisions)
+        : newValues;
+    if (convertedValues == _values) {
+      return;
+    }
+    _values = convertedValues;
+    markNeedsSemanticsUpdate();
+  }
 
   bool get isEnabled => onChanged != null;
 
@@ -2025,6 +2079,18 @@ class _RenderThumbWidget extends RenderBox {
     }
     _divisions = value;
     markNeedsLayout();
+  }
+
+  double _minThumbSeparationValue = 0.0;
+
+  double get minThumbSeparationValue => _minThumbSeparationValue;
+
+  set minThumbSeparationValue(double value) {
+    if (value == _minThumbSeparationValue) {
+      return;
+    }
+    _minThumbSeparationValue = value;
+    markNeedsSemanticsUpdate();
   }
 
   SliderThemeData _sliderTheme;
@@ -2065,6 +2131,32 @@ class _RenderThumbWidget extends RenderBox {
     }
     _textDirection = value;
     markNeedsPaint();
+    markNeedsSemanticsUpdate();
+  }
+
+  SemanticFormatterCallback? _semanticFormatterCallback;
+
+  SemanticFormatterCallback? get semanticFormatterCallback =>
+      _semanticFormatterCallback;
+
+  set semanticFormatterCallback(SemanticFormatterCallback? value) {
+    if (_semanticFormatterCallback == value) {
+      return;
+    }
+    _semanticFormatterCallback = value;
+    markNeedsSemanticsUpdate();
+  }
+
+  TargetPlatform _platform;
+
+  TargetPlatform get platform => _platform;
+
+  set platform(TargetPlatform value) {
+    if (_platform == value) {
+      return;
+    }
+    _platform = value;
+    markNeedsSemanticsUpdate();
   }
 
   @override
@@ -2145,6 +2237,134 @@ class _RenderThumbWidget extends RenderBox {
       isPressed: thumb == lastThumbSelected && lastThumbSelected != null,
     );
   }
+
+  double get _semanticActionUnit =>
+      divisions != null ? 1.0 / divisions! : _adjustmentUnit;
+
+  void _increaseStartAction() {
+    if (isEnabled) {
+      onChanged!(RangeValues(_increasedStartValue, values.end));
+    }
+  }
+
+  void _decreaseStartAction() {
+    if (isEnabled) {
+      onChanged!(RangeValues(_decreasedStartValue, values.end));
+    }
+  }
+
+  void _increaseEndAction() {
+    if (isEnabled) {
+      onChanged!(RangeValues(values.start, _increasedEndValue));
+    }
+  }
+
+  void _decreaseEndAction() {
+    if (isEnabled) {
+      onChanged!(RangeValues(values.start, _decreasedEndValue));
+    }
+  }
+
+  double get _increasedStartValue {
+    // Due to floating-point operations, this value can actually be greater than
+    // expected (e.g. 0.4 + 0.2 = 0.600000000001), so we limit to 2 decimal points.
+    final double increasedStartValue =
+        double.parse((values.start + _semanticActionUnit).toStringAsFixed(2));
+    return increasedStartValue <= values.end - _minThumbSeparationValue
+        ? increasedStartValue
+        : values.start;
+  }
+
+  double get _decreasedStartValue {
+    return clampDouble(values.start - _semanticActionUnit, 0.0, 1.0);
+  }
+
+  double get _increasedEndValue {
+    return clampDouble(values.end + _semanticActionUnit, 0.0, 1.0);
+  }
+
+  double get _decreasedEndValue {
+    final double decreasedEndValue = values.end - _semanticActionUnit;
+    return decreasedEndValue >= values.start + _minThumbSeparationValue
+        ? decreasedEndValue
+        : values.end;
+  }
+
+  double get _adjustmentUnit {
+    switch (platform) {
+      case TargetPlatform.iOS:
+        // Matches iOS implementation of material slider.
+        return 0.1;
+      case TargetPlatform.android:
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        // Matches Android implementation of material slider.
+        return 0.05;
+    }
+  }
+
+  void _increaseAction() {
+    switch (thumb) {
+      case Thumb.start:
+        _increaseStartAction();
+      case Thumb.end:
+        _increaseEndAction();
+    }
+  }
+
+  void _decreaseAction() {
+    switch (thumb) {
+      case Thumb.start:
+        _decreaseStartAction();
+      case Thumb.end:
+        _decreaseEndAction();
+    }
+  }
+
+  String _resolveSemanticValue() {
+    final value = thumb == Thumb.start ? values.start : values.end;
+    if (semanticFormatterCallback != null) {
+      return semanticFormatterCallback!(_rangeSliderState._lerp(value));
+    }
+    return '${(value * 100).round()}%';
+  }
+
+  String _resolveSemanticIncreasedValue() {
+    final increasedValue =
+        thumb == Thumb.start ? _increasedStartValue : _increasedEndValue;
+    if (semanticFormatterCallback != null) {
+      return semanticFormatterCallback!(
+          _rangeSliderState._lerp(increasedValue));
+    }
+    return '${(increasedValue * 100).round()}%';
+  }
+
+  String _resolveSemanticDecreasedValue() {
+    final decreasedValue =
+        thumb == Thumb.start ? _decreasedStartValue : _decreasedEndValue;
+    if (semanticFormatterCallback != null) {
+      return semanticFormatterCallback!(
+          _rangeSliderState._lerp(decreasedValue));
+    }
+    return '${(decreasedValue * 100).round()}%';
+  }
+
+  @override
+  void describeSemanticsConfiguration(SemanticsConfiguration config) {
+    super.describeSemanticsConfiguration(config);
+    config.value = _resolveSemanticValue();
+    config.increasedValue = _resolveSemanticIncreasedValue();
+    config.decreasedValue = _resolveSemanticDecreasedValue();
+    if (isEnabled) {
+      config.onIncrease = _increaseAction;
+      config.onDecrease = _decreaseAction;
+    }
+    config.textDirection = textDirection;
+    config.isEnabled = isEnabled;
+    config.isSlider = true;
+  }
 }
 
 double _discretize(double value, bool isDiscrete, int? divisions) {
@@ -2173,6 +2393,7 @@ class _AccessibleThumb extends StatefulWidget {
     required this.renderSliderKey,
     required this.targetPlatform,
     required this.semanticFormatterCallback,
+    required this.renderThumbKey,
   });
 
   final RangeValues values;
@@ -2185,6 +2406,7 @@ class _AccessibleThumb extends StatefulWidget {
   final GlobalKey renderSliderKey;
   final TargetPlatform targetPlatform;
   final SemanticFormatterCallback? semanticFormatterCallback;
+  final GlobalKey renderThumbKey;
 
   @override
   State<_AccessibleThumb> createState() => _AccessibleThumbState();
@@ -2194,9 +2416,6 @@ class _AccessibleThumbState extends State<_AccessibleThumb> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _updateMinThumb();
-    });
     _actionMap = <Type, Action<Intent>>{
       _AdjustSliderIntent: CallbackAction<_AdjustSliderIntent>(
         onInvoke: _actionHandler,
@@ -2204,20 +2423,9 @@ class _AccessibleThumbState extends State<_AccessibleThumb> {
     };
   }
 
-  @override
-  void didUpdateWidget(covariant _AccessibleThumb oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _updateMinThumb();
-  }
-
-  void _updateMinThumb() {
-    setState(() {
-      _minThumbSeparationValue = (widget.renderSliderKey.currentContext
-                  ?.findRenderObject() as _RenderRangeSlider?)
-              ?._minThumbSeparationValue ??
-          0.0;
-    });
-  }
+  _RenderThumbWidget? get _renderThumbWidget =>
+      widget.renderThumbKey.currentContext?.findRenderObject()
+          as _RenderThumbWidget?;
 
   void _actionHandler(_AdjustSliderIntent intent) {
     final TextDirection directionality = Directionality.of(context);
@@ -2229,12 +2437,28 @@ class _AccessibleThumbState extends State<_AccessibleThumb> {
     };
 
     if (shouldIncrease) {
-      _increaseAction();
+      final semanticValuesInc =
+          _renderThumbWidget?._resolveSemanticIncreasedValue();
+      _renderThumbWidget?._increaseAction();
+      if (semanticValuesInc != null) {
+        SemanticsService.announce(
+          semanticValuesInc,
+          Directionality.of(context),
+          assertiveness: Assertiveness.assertive,
+        );
+      }
     } else {
-      _decreaseAction();
+      final semanticValuesDec =
+          _renderThumbWidget?._resolveSemanticDecreasedValue();
+      _renderThumbWidget?._decreaseAction();
+      if (semanticValuesDec != null) {
+        SemanticsService.announce(
+          semanticValuesDec,
+          Directionality.of(context),
+          assertiveness: Assertiveness.assertive,
+        );
+      }
     }
-    final (semanticValues, _, _) = _resolveSemanticsLabels();
-    SemanticsService.announce(semanticValues, Directionality.of(context));
   }
 
   static const Map<ShortcutActivator, Intent> _traditionalNavShortcutMap =
@@ -2255,170 +2479,27 @@ class _AccessibleThumbState extends State<_AccessibleThumb> {
 
   late Map<Type, Action<Intent>> _actionMap;
 
-  RangeValues get _convertedValues {
-    final oldValues = widget.values;
-    final RangeValues convertedValues = isDiscrete
-        ? _discretizeRangeValues(oldValues, isDiscrete, widget.divisions)
-        : oldValues;
-    return convertedValues;
-  }
-
-  bool get isDiscrete => widget.divisions != null && widget.divisions! > 0;
-
-  double get minThumbSeparationValue => _minThumbSeparationValue;
-  double _minThumbSeparationValue = 0.0;
-
-  bool get isEnabled => widget.onChanged != null;
-
-  double get _semanticActionUnit =>
-      widget.divisions != null ? 1.0 / widget.divisions! : _adjustmentUnit;
-
-  void _increaseStartAction() {
-    if (isEnabled) {
-      widget
-          .onChanged!(RangeValues(_increasedStartValue, _convertedValues.end));
-    }
-  }
-
-  void _decreaseStartAction() {
-    if (isEnabled) {
-      widget
-          .onChanged!(RangeValues(_decreasedStartValue, _convertedValues.end));
-    }
-  }
-
-  void _increaseEndAction() {
-    if (isEnabled) {
-      widget
-          .onChanged!(RangeValues(_convertedValues.start, _increasedEndValue));
-    }
-  }
-
-  void _decreaseEndAction() {
-    if (isEnabled) {
-      widget
-          .onChanged!(RangeValues(_convertedValues.start, _decreasedEndValue));
-    }
-  }
-
-  double get _increasedStartValue {
-    // Due to floating-point operations, this value can actually be greater than
-    // expected (e.g. 0.4 + 0.2 = 0.600000000001), so we limit to 2 decimal points.
-    final double increasedStartValue = double.parse(
-        (_convertedValues.start + _semanticActionUnit).toStringAsFixed(2));
-    return increasedStartValue <=
-            _convertedValues.end - _minThumbSeparationValue
-        ? increasedStartValue
-        : _convertedValues.start;
-  }
-
-  double get _decreasedStartValue {
-    return clampDouble(_convertedValues.start - _semanticActionUnit, 0.0, 1.0);
-  }
-
-  double get _increasedEndValue {
-    return clampDouble(_convertedValues.end + _semanticActionUnit, 0.0, 1.0);
-  }
-
-  double get _decreasedEndValue {
-    final double decreasedEndValue = _convertedValues.end - _semanticActionUnit;
-    return decreasedEndValue >=
-            _convertedValues.start + _minThumbSeparationValue
-        ? decreasedEndValue
-        : _convertedValues.end;
-  }
-
-  double get _adjustmentUnit {
-    switch (widget.targetPlatform) {
-      case TargetPlatform.iOS:
-        // Matches iOS implementation of material slider.
-        return 0.1;
-      case TargetPlatform.android:
-      case TargetPlatform.fuchsia:
-      case TargetPlatform.linux:
-      case TargetPlatform.macOS:
-      case TargetPlatform.windows:
-        // Matches Android implementation of material slider.
-        return 0.05;
-    }
-  }
-
-  void _increaseAction() {
-    switch (widget.thumb) {
-      case Thumb.start:
-        _increaseStartAction();
-      case Thumb.end:
-        _increaseEndAction();
-    }
-  }
-
-  void _decreaseAction() {
-    switch (widget.thumb) {
-      case Thumb.start:
-        _decreaseStartAction();
-      case Thumb.end:
-        _decreaseEndAction();
-    }
-  }
-
   late Map<ShortcutActivator, Intent> shortcutMap =
       switch (MediaQuery.navigationModeOf(context)) {
     NavigationMode.directional => _directionalNavShortcutMap,
     NavigationMode.traditional => _traditionalNavShortcutMap,
   };
 
-  (String, String, String) _resolveSemanticsLabels() {
-    String semanticValues;
-    String semanticIncreasedValues;
-    String semanticDecreasedValues;
-    final value = widget.thumb == Thumb.start
-        ? _convertedValues.start
-        : _convertedValues.end;
-    final increaseValue =
-        widget.thumb == Thumb.start ? _increasedStartValue : _increasedEndValue;
-    final decreaseValue =
-        widget.thumb == Thumb.start ? _decreasedStartValue : _decreasedEndValue;
-    if (widget.semanticFormatterCallback != null) {
-      semanticValues =
-          widget.semanticFormatterCallback!(widget.sliderState._lerp(
-        value,
-      ));
-      semanticIncreasedValues = widget
-          .semanticFormatterCallback!(widget.sliderState._lerp(increaseValue));
-      semanticDecreasedValues = widget
-          .semanticFormatterCallback!(widget.sliderState._lerp(decreaseValue));
-    } else {
-      semanticValues = '${(value * 100).round()}%';
-      semanticIncreasedValues = '${(increaseValue * 100).round()}%';
-      semanticDecreasedValues = '${(decreaseValue * 100).round()}%';
-    }
-    return (semanticValues, semanticIncreasedValues, semanticDecreasedValues);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final (semanticValues, decreasedValues, increasedValues) =
-        _resolveSemanticsLabels();
     return FocusableActionDetector(
       focusNode: widget.focusNode,
       shortcuts: shortcutMap,
       actions: _actionMap,
-      child: Semantics(
-        slider: true,
-        enabled: isEnabled,
-        textDirection: Directionality.of(context),
-        onIncrease: !isEnabled ? null : _increaseAction,
-        onDecrease: !isEnabled ? null : _decreaseAction,
-        value: semanticValues,
-        decreasedValue: decreasedValues,
-        increasedValue: increasedValues,
-        child: _ThumbWidget(
-          sliderTheme: widget.sliderTheme,
-          thumb: widget.thumb,
-          onChanged: widget.onChanged,
-          divisions: widget.divisions,
-          state: widget.sliderState,
-        ),
+      child: _ThumbWidget(
+        semanticFormatterCallback: widget.semanticFormatterCallback,
+        key: widget.renderThumbKey,
+        sliderTheme: widget.sliderTheme,
+        thumb: widget.thumb,
+        onChanged: widget.onChanged,
+        divisions: widget.divisions,
+        rangeSliderState: widget.sliderState,
+        values: widget.values,
       ),
     );
   }

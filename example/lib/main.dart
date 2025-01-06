@@ -65,6 +65,10 @@ class _MyHomePageState extends State<MyHomePage> {
               value: _value,
               onChanged: _updateValueChanged,
             ),
+            RangeSlider(
+              values: _values,
+              onChanged: _rangeValuesChanged,
+            ),
             Slider(
               value: _value,
               onChanged: _updateValueChanged,
