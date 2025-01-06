@@ -32,6 +32,13 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   RangeValues _values = const RangeValues(0, 1);
+  double _value = 0;
+
+  void _updateValueChanged(double value) {
+    setState(() {
+      _value = value;
+    });
+  }
 
   void _rangeValuesChanged(RangeValues values) {
     setState(() {
@@ -47,9 +54,42 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Center(
-        child: AccessibleRangeSlider(
-          values: _values,
-          onChanged: _rangeValuesChanged,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Slider(
+              value: _value,
+              onChanged: _updateValueChanged,
+            ),
+            Slider(
+              value: _value,
+              onChanged: _updateValueChanged,
+            ),
+            Slider(
+              value: _value,
+              onChanged: _updateValueChanged,
+            ),
+            AccessibleRangeSlider(
+              values: _values,
+              onChanged: _rangeValuesChanged,
+            ),
+            AccessibleRangeSlider(
+              values: _values,
+              onChanged: _rangeValuesChanged,
+            ),
+            Slider(
+              value: _value,
+              onChanged: _updateValueChanged,
+            ),
+            AccessibleRangeSlider(
+              values: _values,
+              onChanged: _rangeValuesChanged,
+            ),
+            AccessibleRangeSlider(
+              values: _values,
+              onChanged: _rangeValuesChanged,
+            ),
+          ],
         ),
       ),
     );

@@ -11,7 +11,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:flutter/services.dart';
 
-
 /// A Material Design range slider.
 ///
 /// Used to select a range from a range of values.
@@ -148,6 +147,7 @@ class AccessibleRangeSlider extends StatefulWidget {
   /// The slider's thumbs are drawn at horizontal positions that corresponds to
   /// these values.
   final RangeValues values;
+
   /// Called when the user is selecting a new value for the slider by dragging.
   ///
   /// The slider passes the new values to the callback but does not actually
@@ -425,6 +425,9 @@ class _AccessibleRangeSliderState extends State<AccessibleRangeSlider>
   bool _hovering = false;
 
   void _handleHoverChanged(bool hovering) {
+    if (!_enabled) {
+      return;
+    }
     if (hovering != _hovering) {
       setState(() {
         _hovering = hovering;
@@ -728,49 +731,58 @@ class _AccessibleRangeSliderState extends State<AccessibleRangeSlider>
 
     final onChanged =
         _enabled && (widget.max > widget.min) ? _handleChanged : null;
-    return FocusableActionDetector(
-      enabled: _enabled,
-      includeFocusSemantics: true,
-      onShowHoverHighlight: _handleHoverChanged,
-      mouseCursor: effectiveMouseCursor,
+    return MouseRegion(
+      onEnter: (_) => _handleHoverChanged(true),
+      onExit: (_) => _handleHoverChanged(false),
+      cursor: effectiveMouseCursor,
       child: CompositedTransformTarget(
         link: _layerLink,
-        child: _RangeSliderRenderObjectWidget(
-          key: _renderSliderKey,
-          values: _unlerpRangeValues(widget.values),
-          divisions: widget.divisions,
-          labels: widget.labels,
-          sliderTheme: sliderTheme,
-          textScaleFactor: effectiveTextScale,
-          screenSize: screenSize(),
-          onChanged: onChanged,
-          onChangeStart: widget.onChangeStart != null ? _handleDragStart : null,
-          onChangeEnd: widget.onChangeEnd != null ? _handleDragEnd : null,
-          state: this,
-          hovering: _hovering,
-          endThumb: _AccessibleThumb(
+        child: FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: _RangeSliderRenderObjectWidget(
+            key: _renderSliderKey,
             values: _unlerpRangeValues(widget.values),
             divisions: widget.divisions,
-            focusNode: _endThumbFocusNode,
-            sliderState: this,
-            thumb: Thumb.end,
+            labels: widget.labels,
             sliderTheme: sliderTheme,
+            textScaleFactor: effectiveTextScale,
+            screenSize: screenSize(),
             onChanged: onChanged,
-            renderSliderKey: _renderSliderKey,
-            targetPlatform: Theme.of(context).platform,
-            semanticFormatterCallback: widget.semanticFormatterCallback,
-          ),
-          startThumb: _AccessibleThumb(
-            values: _unlerpRangeValues(widget.values),
-            divisions: widget.divisions,
-            focusNode: _startThumbFocusNode,
-            sliderState: this,
-            thumb: Thumb.start,
-            sliderTheme: sliderTheme,
-            onChanged: onChanged,
-            renderSliderKey: _renderSliderKey,
-            targetPlatform: Theme.of(context).platform,
-            semanticFormatterCallback: widget.semanticFormatterCallback,
+            onChangeStart:
+                widget.onChangeStart != null ? _handleDragStart : null,
+            onChangeEnd: widget.onChangeEnd != null ? _handleDragEnd : null,
+            state: this,
+            hovering: _hovering,
+            endThumb: FocusTraversalOrder(
+              order: const NumericFocusOrder(1),
+              child: _AccessibleThumb(
+                values: _unlerpRangeValues(widget.values),
+                divisions: widget.divisions,
+                focusNode: _endThumbFocusNode,
+                sliderState: this,
+                thumb: Thumb.end,
+                sliderTheme: sliderTheme,
+                onChanged: onChanged,
+                renderSliderKey: _renderSliderKey,
+                targetPlatform: Theme.of(context).platform,
+                semanticFormatterCallback: widget.semanticFormatterCallback,
+              ),
+            ),
+            startThumb: FocusTraversalOrder(
+              order: const NumericFocusOrder(0),
+              child: _AccessibleThumb(
+                values: _unlerpRangeValues(widget.values),
+                divisions: widget.divisions,
+                focusNode: _startThumbFocusNode,
+                sliderState: this,
+                thumb: Thumb.start,
+                sliderTheme: sliderTheme,
+                onChanged: onChanged,
+                renderSliderKey: _renderSliderKey,
+                targetPlatform: Theme.of(context).platform,
+                semanticFormatterCallback: widget.semanticFormatterCallback,
+              ),
+            ),
           ),
         ),
       ),
