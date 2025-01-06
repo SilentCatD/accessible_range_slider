@@ -1,6 +1,6 @@
 name: accessible_range_slider
 description: "A RangeSlider variation that support keyboard interactivity for accessibility usages."
-version: 1.0.1
+version: 1.0.2
 issue_tracker: https://github.com/SilentCatD/accessible_range_slider/issues
 repository: https://github.com/SilentCatD/accessible_range_slider
 
